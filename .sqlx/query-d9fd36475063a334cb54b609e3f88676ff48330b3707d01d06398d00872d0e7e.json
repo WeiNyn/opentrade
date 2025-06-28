@@ -1,0 +1,118 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO kline_data (\n                start_time, end_time, symbol, interval, first_trade_id, last_trade_id,\n                open, high, low, close, volume, trade_count, quote_volume\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\n            RETURNING *\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "end_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "symbol",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "interval",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "first_trade_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_trade_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "open",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "high",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "low",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "close",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "volume",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "trade_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "quote_volume",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "update_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Int4",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Int4",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d9fd36475063a334cb54b609e3f88676ff48330b3707d01d06398d00872d0e7e"
+}
