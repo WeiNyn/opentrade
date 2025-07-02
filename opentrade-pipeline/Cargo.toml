@@ -1,0 +1,13 @@
+[package]
+name = "opentrade-pipeline"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { workspace = true }
+opentrade-core = { workspace = true }
+tokio = { workspace = true }
+binance_spot_connector_rust = { workspace = true }
+sqlx = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }

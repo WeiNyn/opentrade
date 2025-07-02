@@ -8,21 +8,52 @@ use sqlx::types::BigDecimal;
 
 use crate::models::KlineData;
 
+/// Fetches k-line (candlestick) data from the Binance API.
+///
+/// # Arguments
+///
+/// * `symbol` - The trading symbol (e.g., "BTCUSDT").
+/// * `interval` - The k-line interval (e.g., `KlineInterval::Minutes1`).
+/// * `start_time` - The start time in milliseconds since the UNIX epoch.
+/// * `end_time` - An optional end time in milliseconds since the UNIX epoch.
+/// * `limit` - An optional limit on the number of k-lines to retrieve.
+///
+/// # Returns
+///
+/// A `Result` containing the raw JSON string response from the API on success,
+/// or a `binance_spot_connector_rust::hyper::Error` on failure.
 pub async fn get_kline_data(
     symbol: &str,
     interval: KlineInterval,
     start_time: u64,
-    end_time: u64,
+    end_time: Option<u64>,
+    limit: Option<u32>,
 ) -> Result<String, Error> {
     let client = BinanceHttpClient::default();
-    let request = market::klines(symbol, interval)
-        .start_time(start_time)
-        .end_time(end_time);
+    let mut request = market::klines(symbol, interval)
+        .start_time(start_time);
+    if let Some(end_time) = end_time {
+        request = request.end_time(end_time);
+    }
+    if let Some(limit) = limit {
+        request = request.limit(limit);
+    }
     let response = client.send(request).await?;
     let data = response.into_body_str().await?;
     Ok(data)
 }
 
+/// Parses a `serde_json::Value` containing a string representation of a decimal
+/// into a `BigDecimal`.
+///
+/// # Arguments
+///
+/// * `value` - A `serde_json::Value` that is expected to be a string.
+///
+/// # Returns
+///
+/// A `Result` containing the parsed `BigDecimal` on success, or a `serde_json::Error`
+/// if the value is not a string or cannot be parsed into a `BigDecimal`.
 pub fn parse_decimal_string(
     value: &Value,
 ) -> Result<BigDecimal, serde_json::Error> {
@@ -32,6 +63,20 @@ pub fn parse_decimal_string(
 }
 
 
+/// Parses a single k-line data array from a `serde_json::Value` into a `KlineData` struct.
+///
+/// The input `Value` is expected to be a JSON array with the following structure:
+/// `[open_time, open, high, low, close, volume, close_time, quote_volume, number_of_trades, ...]`
+///
+/// # Arguments
+///
+/// * `kline` - A `serde_json::Value` representing a single k-line array.
+/// * `symbol` - The trading symbol associated with this k-line data.
+///
+/// # Returns
+///
+/// A `Result` containing the parsed `KlineData` struct on success, or a `serde_json::Error`
+/// if the input is not a valid array or if any fields are missing or have an invalid format.
 pub fn parse_kline_data(
     kline: Value,
     symbol: &str,
@@ -103,6 +148,17 @@ pub fn parse_kline_data(
 
 }
 
+/// Parses a JSON string containing an array of k-line data arrays into a vector of `KlineData`.
+///
+/// # Arguments
+///
+/// * `klines_data` - A string slice containing the JSON response from the k-line API.
+/// * `symbol` - The trading symbol to associate with the parsed k-line data.
+///
+/// # Returns
+///
+/// A `Result` containing a `Vec<KlineData>` on success, or a `serde_json::Error` if the
+/// string is not valid JSON or does not conform to the expected array structure.
 pub fn extract_klines_from_string(
     klines_data: &str,
     symbol: &str,
@@ -126,6 +182,7 @@ pub fn extract_klines_from_string(
 }
 
 #[cfg(test)]
+/// This module contains tests for the API client functions.
 mod tests {
     use super::*;
     use serde_json::json;
@@ -234,7 +291,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_data_e2e() {
-        let result = get_kline_data("BTCUSDT", KlineInterval::Minutes1, 1751073120000, 1751103239999).await.unwrap();
+        let result = get_kline_data("BTCUSDT", KlineInterval::Minutes1, 1751073120000, None, Some(100)).await.unwrap();
         let klines = extract_klines_from_string(&result, "BTCUSDT").unwrap();
         println!("Klines: {:?}", klines);
         assert!(!klines.is_empty());
