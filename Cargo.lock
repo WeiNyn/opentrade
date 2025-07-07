@@ -203,7 +203,7 @@ dependencies = [
  "signature",
  "strum",
  "tokio",
- "tokio-tungstenite 0.23.1",
+ "tokio-tungstenite",
  "tungstenite 0.23.0",
  "ureq",
  "url",
@@ -1633,7 +1633,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tokio",
- "tokio-tungstenite 0.27.0",
+ "tokio-tungstenite",
  "tungstenite 0.27.0",
 ]
 
@@ -1644,11 +1644,13 @@ dependencies = [
  "anyhow",
  "binance_spot_connector_rust",
  "chrono",
+ "futures-util",
  "log",
  "serde",
  "serde_json",
  "sqlx",
  "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
@@ -2813,18 +2815,6 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tungstenite 0.23.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "489a59b6730eda1b0171fcfda8b121f4bee2b35cba8645ca35c5f7ba3eb736c1"
-dependencies = [
- "futures-util",
- "log",
- "tokio",
- "tungstenite 0.27.0",
 ]
 
 [[package]]
