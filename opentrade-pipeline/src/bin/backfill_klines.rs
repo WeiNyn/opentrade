@@ -71,15 +71,12 @@ pub async fn main() {
         .expect("Failed to parse start time")
         .and_utc()
         .timestamp_millis() as u64;
-    let end_time = match args.end_time {
-        Some(end_time) => Some(
-            NaiveDateTime::parse_from_str(&end_time, "%Y-%m-%d %H:%M:%S")
-                .expect("Failed to parse end time")
-                .and_utc()
-                .timestamp_millis() as u64,
-        ),
-        None => None,
-    };
+    let end_time = args.end_time.map(|end_time| {
+        NaiveDateTime::parse_from_str(&end_time, "%Y-%m-%d %H:%M:%S")
+            .expect("Failed to parse end time")
+            .and_utc()
+            .timestamp_millis() as u64
+    });
     let interval = match args.interval.as_str() {
         "1m" => KlineInterval::Minutes1,
         "5m" => KlineInterval::Minutes5,

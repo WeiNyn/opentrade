@@ -46,7 +46,7 @@ pub async fn kline_backfill(
 
     for kline in klines {
         kline
-            .upsert(&pool)
+            .upsert(pool)
             .await
             .expect("Failed to insert kline data");
     }

@@ -1,7 +1,80 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::types::BigDecimal as Decimal;
 use std::fmt::Debug;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SerdableKlineData {
+    #[serde(rename = "t")]
+    pub start_time: u64,
+    #[serde(rename = "T")]
+    pub end_time: u64,
+    #[serde(rename = "s")]
+    pub symbol: String,
+    #[serde(rename = "i")]
+    pub interval: String,
+    #[serde(rename = "f")]
+    pub first_trade_id: i32,
+    #[serde(rename = "L")]
+    pub last_trade_id: i32,
+    #[serde(rename = "o")]
+    pub open: String,
+    #[serde(rename = "c")]
+    pub close: String,
+    #[serde(rename = "h")]
+    pub high: String,
+    #[serde(rename = "l")]
+    pub low: String,
+    #[serde(rename = "v")]
+    pub volume: String,
+    #[serde(rename = "n")]
+    pub trade_count: u64,
+    #[serde(rename = "q")]
+    pub quote_volume: String,
+}
+
+impl From<SerdableKlineData> for KlineData {
+    fn from(data: SerdableKlineData) -> Self {
+        KlineData {
+            start_time: DateTime::from_timestamp_millis(data.start_time as i64).unwrap(),
+            end_time: DateTime::from_timestamp_millis(data.end_time as i64).unwrap(),
+            symbol: data.symbol,
+            interval: data.interval,
+            first_trade_id: data.first_trade_id,
+            last_trade_id: data.last_trade_id,
+            open: data.open.parse::<Decimal>().unwrap(),
+            high: data.high.parse::<Decimal>().unwrap(),
+            low: data.low.parse::<Decimal>().unwrap(),
+            close: data.close.parse::<Decimal>().unwrap(),
+            volume: data.volume.parse::<Decimal>().unwrap(),
+            trade_count: Some(data.trade_count as i32),
+            quote_volume: Some(data.quote_volume.parse::<Decimal>().unwrap()),
+            created_at: None,
+            update_at: None,
+        }
+    }
+}
+
+impl From<KlineData> for SerdableKlineData {
+    fn from(data: KlineData) -> Self {
+        SerdableKlineData {
+            start_time: data.start_time.timestamp_millis() as u64,
+            end_time: data.end_time.timestamp_millis() as u64,
+            symbol: data.symbol,
+            interval: data.interval,
+            first_trade_id: data.first_trade_id,
+            last_trade_id: data.last_trade_id,
+            open: data.open.to_string(),
+            close: data.close.to_string(),
+            high: data.high.to_string(),
+            low: data.low.to_string(),
+            volume: data.volume.to_string(),
+            trade_count: data.trade_count.unwrap_or(0) as u64,
+            quote_volume: data.quote_volume.unwrap_or_default().to_string(),
+        }
+    }
+}
 
 /// Represents a single Kline (candlestick) data point for a specific symbol and interval.
 #[derive(FromRow, Debug, Clone)]

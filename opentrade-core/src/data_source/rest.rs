@@ -84,7 +84,7 @@ pub fn parse_kline_data(
     match kline.is_array() {
         true => {
             let array = kline.as_array().unwrap();
-            let open_time = array.get(0)
+            let open_time = array.first()
                 .and_then(|v| v.as_u64())
                 .ok_or_else(|| serde_json::Error::custom("Missing or invalid open time"))?;
             let open_price = parse_decimal_string(
@@ -130,8 +130,8 @@ pub fn parse_kline_data(
                 &close_time,
                 symbol,
                 "1m",
-                0 as i32,
-                0 as i32,
+                0,
+                0,
                 open_price,
                 high_price,
                 low_price,
@@ -142,7 +142,7 @@ pub fn parse_kline_data(
             ))
             }
         false => {
-            return Err(serde_json::Error::custom("Expected kline data to be an array"));
+            Err(serde_json::Error::custom("Expected kline data to be an array"))
         }
     }
 
@@ -176,7 +176,7 @@ pub fn extract_klines_from_string(
             Ok(klines)
         },
         false => {
-            return Err(serde_json::Error::custom("Expected klines data is an array"));
+            Err(serde_json::Error::custom("Expected klines data is an array"))
         }
     }
 }
