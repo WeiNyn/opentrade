@@ -1673,6 +1673,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "binance_spot_connector_rust",
+ "chrono",
  "clap",
  "env_logger",
  "log",

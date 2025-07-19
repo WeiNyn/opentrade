@@ -1,7 +1,7 @@
 use binance_spot_connector_rust::market::klines::KlineInterval;
+use chrono::NaiveDateTime;
 use clap::Parser;
 use env_logger::Builder;
-use sqlx::types::chrono::NaiveDateTime;
 
 // Backfill Klines Data
 #[derive(Parser, Debug)]
@@ -11,11 +11,14 @@ struct BackfillKlinesArgs {
     #[arg(short = 's', long)]
     symbol: String,
 
-    /// The start time in milliseconds since epoch
-    #[arg(short = 'S', long)]
-    start_time: String,
+    #[arg(short = 'f', long)]
+    back_seconds: Option<i64>,
 
-    /// The end time in milliseconds since epoch
+    /// The start time in format "YYYY-MM-DD HH:MM:SS"
+    #[arg(short = 'S', long)]
+    start_time: Option<String>,
+
+    /// The end time in format "YYYY-MM-DD HH:MM:SS", optional
     #[arg(short = 'E', long)]
     end_time: Option<String>,
 
@@ -39,6 +42,24 @@ pub async fn main() {
         .init();
     let args = BackfillKlinesArgs::parse();
 
+    // If back_seconds is provided, calculate start time
+    let start_time = if let Some(seconds) = args.back_seconds {
+        let now = chrono::Utc::now();
+        let start = now - chrono::Duration::seconds(seconds);
+        let start = start.naive_local();
+        // Format start time as "YYYY-MM-DD HH:MM:SS"
+        Some(start.format("%Y-%m-%d %H:%M:%S").to_string())
+    } else {
+        args.start_time.clone()
+    };
+
+    if start_time.is_none() && args.end_time.is_none() {
+        eprintln!("Either --start-time or --end-time must be provided.");
+        return;
+    }
+
+    let start_time = start_time.unwrap();
+
     // Here you would implement the logic to backfill klines data
     // For example, you might call a function that fetches the data
     // from an exchange and stores it in a database.
@@ -48,7 +69,7 @@ pub async fn main() {
             log::info!(
                 "Backfilling klines for symbol: {}, from {} to {}, interval: {}",
                 args.symbol,
-                args.start_time,
+                &start_time,
                 end_time,
                 args.interval
             );
@@ -57,7 +78,7 @@ pub async fn main() {
             log::info!(
                 "Backfilling klines for symbol: {}, from {} to now, interval: {}",
                 args.symbol,
-                args.start_time,
+                &start_time,
                 args.interval
             );
         }
@@ -66,8 +87,8 @@ pub async fn main() {
     // Placeholder for actual backfill logic
     // backfill_klines(args.symbol, args.start_time, args.end_time, args.interval).await;
     let symbol = args.symbol;
-    log::info!("{}", args.start_time);
-    let start_time = NaiveDateTime::parse_from_str(&args.start_time, "%Y-%m-%d %H:%M:%S")
+    log::info!("{}", start_time);
+    let start_time = NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
         .expect("Failed to parse start time")
         .and_utc()
         .timestamp_millis() as u64;
