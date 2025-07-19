@@ -4,6 +4,44 @@ use sqlx::FromRow;
 use sqlx::types::BigDecimal as Decimal;
 use std::fmt::Debug;
 
+/// A serializable representation of Kline (candlestick) data optimized for JSON serialization.
+///
+/// This struct mirrors the format used by cryptocurrency exchange APIs (particularly Binance)
+/// and is designed for efficient serialization/deserialization over network protocols.
+/// All numeric fields are represented as strings to maintain precision and compatibility
+/// with exchange API responses.
+///
+/// # Fields
+///
+/// The field names use single-letter aliases that match exchange API conventions:
+/// - `t`: Start time of the Kline interval (Unix timestamp in milliseconds)
+/// - `T`: End time of the Kline interval (Unix timestamp in milliseconds)
+/// - `s`: Trading symbol (e.g., "BTCUSDT")
+/// - `i`: Kline interval (e.g., "1m", "1h", "1d")
+/// - `f`: ID of the first trade in this interval
+/// - `L`: ID of the last trade in this interval
+/// - `o`: Opening price (as string to preserve precision)
+/// - `c`: Closing price (as string to preserve precision)
+/// - `h`: Highest price during the interval (as string)
+/// - `l`: Lowest price during the interval (as string)
+/// - `v`: Volume of the base asset traded (as string)
+/// - `n`: Total number of trades during the interval
+/// - `q`: Volume of the quote asset traded (as string)
+///
+/// # Usage
+///
+/// ```rust
+/// use opentrade_core::models::SerdableKlineData;
+/// use serde_json;
+///
+/// // Deserialize from JSON (e.g., from exchange API)
+/// let json = r#"{"t":1640995200000,"T":1640995259999,"s":"BTCUSDT","i":"1m",...}"#;
+/// let kline: SerdableKlineData = serde_json::from_str(json)?;
+///
+/// // Convert to database-ready format
+/// let db_kline = opentrade_core::models::KlineData::from(kline);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SerdableKlineData {
     #[serde(rename = "t")]
@@ -34,6 +72,48 @@ pub struct SerdableKlineData {
     pub quote_volume: String,
 }
 
+/// Converts a [`SerdableKlineData`] into a [`KlineData`] for database storage.
+///
+/// This conversion transforms the string-based serializable format into a typed
+/// database model with proper data types for efficient storage and querying.
+///
+/// # Conversions Performed
+///
+/// - Timestamp fields (u64) → DateTime<Utc> using millisecond precision
+/// - String price/volume fields → BigDecimal for precise financial calculations
+/// - Trade ID fields (u64) → i32 (database constraint)
+/// - String fields remain as String
+/// - Sets created_at and update_at to None (will be populated by database)
+///
+/// # Panics
+///
+/// This implementation will panic if:
+/// - Timestamp values cannot be converted to valid DateTime objects
+/// - String numeric values cannot be parsed as BigDecimal
+///
+/// # Example
+///
+/// ```rust
+/// use opentrade_core::models::{SerdableKlineData, KlineData};
+///
+/// let serdable = SerdableKlineData {
+///     start_time: 1640995200000,
+///     end_time: 1640995259999,
+///     symbol: "BTCUSDT".to_string(),
+///     interval: "1m".to_string(),
+///     first_trade_id: 123456,
+///     last_trade_id: 123457,
+///     open: "50000.00".to_string(),
+///     close: "50100.00".to_string(),
+///     high: "50200.00".to_string(),
+///     low: "49900.00".to_string(),
+///     volume: "10.5".to_string(),
+///     trade_count: 100,
+///     quote_volume: "525000.00".to_string(),
+/// };
+///
+/// let kline_data: KlineData = serdable.into();
+/// ```
 impl From<SerdableKlineData> for KlineData {
     fn from(data: SerdableKlineData) -> Self {
         KlineData {
@@ -56,6 +136,48 @@ impl From<SerdableKlineData> for KlineData {
     }
 }
 
+/// Converts a [`KlineData`] into a [`SerdableKlineData`] for serialization.
+///
+/// This conversion transforms the typed database model back into a string-based
+/// format suitable for JSON serialization and API responses. This is useful when
+/// retrieving data from the database and sending it over network protocols.
+///
+/// # Conversions Performed
+///
+/// - DateTime<Utc> fields → u64 timestamps (milliseconds since Unix epoch)
+/// - BigDecimal price/volume fields → String representation
+/// - i32 trade ID fields → u64 (expanding type for compatibility)
+/// - Optional fields → Default values if None (0 for trade_count, empty string for quote_volume)
+/// - String fields remain as String
+///
+/// # Example
+///
+/// ```rust
+/// use opentrade_core::models::{KlineData, SerdableKlineData};
+/// use chrono::{DateTime, Utc};
+/// use sqlx::types::BigDecimal;
+/// use std::str::FromStr;
+///
+/// let kline_data = KlineData {
+///     start_time: DateTime::from_timestamp_millis(1640995200000).unwrap(),
+///     end_time: DateTime::from_timestamp_millis(1640995259999).unwrap(),
+///     symbol: "BTCUSDT".to_string(),
+///     interval: "1m".to_string(),
+///     first_trade_id: 123456,
+///     last_trade_id: 123457,
+///     open: BigDecimal::from_str("50000.00").unwrap(),
+///     close: BigDecimal::from_str("50100.00").unwrap(),
+///     high: BigDecimal::from_str("50200.00").unwrap(),
+///     low: BigDecimal::from_str("49900.00").unwrap(),
+///     volume: BigDecimal::from_str("10.5").unwrap(),
+///     trade_count: Some(100),
+///     quote_volume: Some(BigDecimal::from_str("525000.00").unwrap()),
+///     created_at: None,
+///     update_at: None,
+/// };
+///
+/// let serdable: SerdableKlineData = kline_data.into();
+/// ```
 impl From<KlineData> for SerdableKlineData {
     fn from(data: KlineData) -> Self {
         SerdableKlineData {
