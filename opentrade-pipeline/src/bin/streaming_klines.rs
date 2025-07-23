@@ -1,6 +1,8 @@
+use std::env::var;
+
 use anyhow::Result;
 use async_trait::async_trait;
-use binance_spot_connector_rust::market::klines::KlineInterval;
+use binance_spot_connector_rust::{market::klines::KlineInterval, market_stream::kline};
 use opentrade_core::{
     data_source::websocket::{KlineStreaming, MessageHandler},
     models::{KlineData, SerdableKlineData},
@@ -155,6 +157,60 @@ impl MessageHandler<SerdableKlineData> for UpsertKlineHandler {
     }
 }
 
+/// Backfills kline data for a specific trading symbol and interval.
+///
+/// This function fetches historical kline data from the Binance API and
+/// persists it to a PostgreSQL database. It supports both time range
+/// specifications and a backfill duration in seconds.
+///
+/// # Parameters
+/// * `symbol` - The trading symbol to backfill (e.g., "BTCUSDT").
+/// * `interval` - The kline interval (e.g., "1m", "5m", "1h").
+/// * `database_url` - The PostgreSQL database connection string.
+pub struct KlineStreamingConfig {
+    /// The trading symbol to stream kline data for (e.g., "BTCUSDT")
+    pub symbol: String,
+    /// The interval for kline data (e.g., 1 minute, 5 minutes)
+    pub interval: String,
+    /// The database connection pool for persisting kline data
+    pub database_url: String,
+}
+
+impl KlineStreamingConfig {
+    /// Creates a new [`KlineStreamingConfig`] instance from environment variables.
+    /// # Environment Variables
+    /// * `KLINE_SYMBOL` - The trading symbol to stream (default: "BTCUSDT")
+    /// * `KLINE_INTERVAL` - The kline interval (default: "1m")
+    /// * `DATABASE_URL` - The PostgreSQL database connection string
+    ///   (default: "postgres://postgres:password@localhost/postgres")
+    /// # Returns
+    /// Returns a `Result<Self>` containing the configuration or an error if
+    /// environment variables are not set or invalid.
+    /// # Example
+    /// ```rust
+    /// let config = KlineStreamingConfig::from_env()
+    ///     .expect("Failed to load KlineStreamingConfig from environment");
+    /// ```
+    /// # Errors
+    /// Returns an error if any required environment variable is missing or invalid.
+    /// This includes:
+    /// - `KLINE_SYMBOL` not set
+    /// - `KLINE_INTERVAL` not set or unsupported value
+    /// - `DATABASE_URL` not set or invalid format
+    pub fn from_env() -> Result<Self> {
+        let symbol = var("KLINE_SYMBOL").unwrap_or_else(|_| "BTCUSDT".to_string());
+        let interval = var("KLINE_INTERVAL").unwrap_or_else(|_| "1m".to_string());
+        let database_url = var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://postgres:password@localhost/postgres".to_string());
+
+        Ok(Self {
+            symbol,
+            interval,
+            database_url,
+        })
+    }
+}
+
 /// Main entry point for the real-time kline data streaming binary.
 ///
 /// This binary establishes a WebSocket connection to Binance to stream live
@@ -216,12 +272,32 @@ impl MessageHandler<SerdableKlineData> for UpsertKlineHandler {
 /// - Implementing more robust error handling and recovery
 #[tokio::main]
 async fn main() {
-    let mut kline_streaming = KlineStreaming::new("BTCUSDT", KlineInterval::Minutes1)
+    let kline_streaming_config = KlineStreamingConfig::from_env()
+        .expect("Failed to load KlineStreamingConfig from environment variables");
+
+    let symbol = kline_streaming_config.symbol;
+    let interval = match kline_streaming_config.interval.as_str() {
+        "1m" => KlineInterval::Minutes1,
+        "5m" => KlineInterval::Minutes5,
+        "15m" => KlineInterval::Minutes15,
+        "30m" => KlineInterval::Minutes30,
+        "1h" => KlineInterval::Hours1,
+        "4h" => KlineInterval::Hours4,
+        "1d" => KlineInterval::Days1,
+        _ => panic!(
+            "Unsupported kline interval: {}",
+            kline_streaming_config.interval
+        ),
+    };
+    let mut kline_streaming = KlineStreaming::new(&symbol, interval)
         .await
-        .unwrap();
+        .expect("Failed to create KlineStreaming instance");
     kline_streaming.add_callback(PrintKlineHandler { count: 0 });
 
-    let pool = PgPool::connect("postgres://postgres:password@localhost/postgres")
+    let database_url = var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:password@localhost/postgres".to_string());
+    log::info!("Connecting to database at {}", database_url);
+    let pool = PgPool::connect(&database_url)
         .await
         .expect("Failed to connect to database");
     kline_streaming.add_callback(UpsertKlineHandler::new(pool));

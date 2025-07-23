@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  # TimescaleDB - PostgreSQL with TimescaleDB extension
+  timescaledb:
+    image: timescale/timescaledb:pg17
+    container_name: opentrade-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./docker/init-timescaledb.sql:/docker-entrypoint-initdb.d/01-init-timescaledb.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - opentrade-network
+
+  # Database migrations service - runs once to set up schema
+  migrations:
+    image: migrate/migrate:latest
+    container_name: opentrade-migrations
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    command: [
+      "-path=/migrations",
+      "-database=postgres://postgres:password@timescaledb:5432/postgres?sslmode=disable",
+      "up"
+    ]
+    networks:
+      - opentrade-network
+    restart: "no"
+
+  # Streaming klines service - main application
+  streaming-klines:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${DOCKER_TARGET:-}
+    container_name: opentrade-streaming-klines
+    restart: unless-stopped
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://postgres:password@timescaledb:5432/postgres
+      RUST_LOG: ${RUST_LOG:-info}
+      RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
+    command: ["/app/bin/streaming_klines"]
+    networks:
+      - opentrade-network
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f streaming_klines"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Backfill service - optional, can be run manually
+  backfill-klines:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${DOCKER_TARGET:-}
+    container_name: opentrade-backfill-klines
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://postgres:password@timescaledb:5432/postgres
+      RUST_LOG: ${RUST_LOG:-info}
+      RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
+    command: ["/app/bin/backfill_klines"]
+    networks:
+      - opentrade-network
+    profiles:
+      - backfill
+    restart: "no"
+
+  # Grafana - Data visualization dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: opentrade-grafana
+    restart: unless-stopped
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_SECURITY_ALLOW_EMBEDDING: true
+      GF_AUTH_ANONYMOUS_ENABLED: false
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - opentrade-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Networks
+networks:
+  opentrade-network:
+    driver: bridge
+    name: opentrade-network
+
+# Volumes for data persistence
+volumes:
+  timescaledb_data:
+    name: opentrade-timescaledb-data
+    driver: local
+  grafana_data:
+    name: opentrade-grafana-data
+    driver: local

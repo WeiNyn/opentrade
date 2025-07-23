@@ -2,6 +2,7 @@ use binance_spot_connector_rust::market::klines::KlineInterval;
 use chrono::NaiveDateTime;
 use clap::Parser;
 use env_logger::Builder;
+use tokio_cron_scheduler::{Job, JobScheduler, JobSchedulerError};
 
 /// Command line arguments for the kline data backfill binary.
 ///
@@ -202,6 +203,8 @@ pub async fn main() {
     let pool = sqlx::PgPool::connect(&db_connection)
         .await
         .expect("Failed to connect to the database");
+
+    
 
     log::info!(
         "Starting backfill for symbol: {}, interval: {}, start_time: {}, end_time: {:?}, limit: {:?}, delay: {:?}",

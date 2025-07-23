@@ -1,0 +1,43 @@
+# Grafana datasource configuration for TimescaleDB
+# This file automatically configures the TimescaleDB connection in Grafana
+
+apiVersion: 1
+
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: postgres
+    user: postgres
+    secureJsonData:
+      password: password
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600  # PostgreSQL 16
+      timescaledb: true
+    isDefault: true
+    editable: true
+    version: 1
+    uid: timescaledb-uid
+
+  - name: TimescaleDB (Read-Only)
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: postgres
+    user: postgres
+    secureJsonData:
+      password: password
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: true
+      queryTimeout: 300s
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+    isDefault: false
+    editable: false
+    version: 1
+    uid: timescaledb-readonly-uid

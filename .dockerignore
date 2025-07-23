@@ -1,0 +1,114 @@
+# Docker ignore file for opentrade Rust project
+# This file helps reduce build context size and improves build performance
+
+# Git and version control
+.git/
+.gitignore
+.gitmodules
+.gitattributes
+
+# Docker files (avoid recursive copying)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Build artifacts and cache
+# target/
+# **/target/
+# Cargo.lock
+.cargo/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation and markdown files
+*.md
+README*
+CHANGELOG*
+LICENSE*
+docs/
+documentation/
+
+# Test files and artifacts
+tests/
+test_data/
+*.test
+coverage/
+*.profraw
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/
+.tmp/
+
+# Environment and configuration files
+.env*
+!.env.example
+*.local
+local.properties
+
+# Node.js (if any frontend components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python cache (if any Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Development and debugging
+debug/
+*.debug
+*.pdb
+core.*
+
+# Configuration directories that shouldn't be copied
+grafana/
+prometheus/
+nginx/
+scripts/
+docker/
+migrations/
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+azure-pipelines.yml
+
+# Miscellaneous
+*.txt
+!requirements.txt
+!Cargo.toml
+examples/
+benchmarks/

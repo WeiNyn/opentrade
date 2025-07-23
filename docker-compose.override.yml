@@ -1,0 +1,126 @@
+# Docker Compose override file for development environment
+# This file extends docker-compose.yml with development-specific configurations
+# It will be automatically loaded when running docker-compose commands
+
+version: '3.8'
+
+services:
+  # Development overrides for TimescaleDB
+  timescaledb:
+    environment:
+      # Enable more verbose logging for development
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --log-statement=all"
+    ports:
+      # Expose on all interfaces for external access during development
+      - "0.0.0.0:5432:5432"
+    volumes:
+      # Additional volume for development SQL scripts
+      - ./docker/dev-scripts:/docker-entrypoint-initdb.d/dev:ro
+
+  # Development overrides for streaming service
+  streaming-klines:
+    build:
+      # Enable BuildKit for faster builds
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - rust:1.75-slim
+    environment:
+      # More verbose logging for development
+      RUST_LOG: debug
+      RUST_BACKTRACE: full
+      # Development database connection with connection pooling disabled for easier debugging
+      DATABASE_URL: postgres://postgres:password@timescaledb:5432/postgres?sslmode=disable
+    volumes:
+      # Mount source code for live development (if using cargo watch)
+      - ./src:/app/src:ro
+      - ./opentrade-core:/app/opentrade-core:ro
+      - ./opentrade-pipeline:/app/opentrade-pipeline:ro
+      - ./Cargo.toml:/app/Cargo.toml:ro
+      - ./Cargo.lock:/app/Cargo.lock:ro
+    # Override restart policy for development
+    restart: "no"
+    # Allow easier debugging by keeping container running even if app crashes
+    tty: true
+    stdin_open: true
+
+  # Development overrides for backfill service
+  backfill-klines:
+    environment:
+      RUST_LOG: debug
+      RUST_BACKTRACE: full
+      DATABASE_URL: postgres://postgres:password@timescaledb:5432/postgres?sslmode=disable
+    volumes:
+      # Mount source code for development
+      - ./src:/app/src:ro
+      - ./opentrade-core:/app/opentrade-core:ro
+      - ./opentrade-pipeline:/app/opentrade-pipeline:ro
+      - ./Cargo.toml:/app/Cargo.toml:ro
+      - ./Cargo.lock:/app/Cargo.lock:ro
+    tty: true
+    stdin_open: true
+
+  # Development overrides for Grafana
+  grafana:
+    environment:
+      # Enable development mode features
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: true
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_LOG_LEVEL: debug
+      GF_FEATURE_TOGGLES_ENABLE: publicDashboards
+    ports:
+      # Expose on all interfaces for external access
+      - "0.0.0.0:3000:3000"
+    volumes:
+      # Mount additional development dashboards
+      - ./grafana/dev-dashboards:/var/lib/grafana/dev-dashboards:ro
+      # Mount plugins directory for development
+      - ./grafana/plugins:/var/lib/grafana/plugins:rw
+
+  # Additional development services
+  
+  # pgAdmin for database management (development only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: opentrade-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@opentrade.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - opentrade-network
+    profiles:
+      - dev-tools
+
+  # Redis for caching (development/testing)
+  redis:
+    image: redis:7-alpine
+    container_name: opentrade-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - opentrade-network
+    profiles:
+      - dev-tools
+    command: redis-server --appendonly yes
+
+# Additional volumes for development
+volumes:
+  pgadmin_data:
+    name: opentrade-pgadmin-data
+    driver: local
+  redis_data:
+    name: opentrade-redis-data
+    driver: local
