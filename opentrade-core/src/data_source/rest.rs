@@ -293,7 +293,7 @@ mod tests {
     async fn test_get_data_e2e() {
         let result = get_kline_data("BTCUSDT", KlineInterval::Minutes1, 1751073120000, None, Some(100)).await.unwrap();
         let klines = extract_klines_from_string(&result, "BTCUSDT").unwrap();
-        println!("Klines: {:?}", klines);
+        println!("Klines: {klines:?}");
         assert!(!klines.is_empty());
     }
 }

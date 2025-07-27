@@ -233,7 +233,7 @@ impl Payload {
 
         fn parse_decimal_string(s: &str) -> Result<BigDecimal> {
             s.parse::<BigDecimal>()
-                .context(format!("Failed to parse decimal string: {}", s))
+                .context(format!("Failed to parse decimal string: {s}"))
         }
 
         let quote_volume = parse_decimal_string(&kline.quote_volume)?;
@@ -467,7 +467,7 @@ impl KlineStreaming {
                 let binary_data = message.into_data();
                 let data = std::str::from_utf8(&binary_data)
                     .expect("Failed to convert binary data to string");
-                println!("Received Kline message: {}", data);
+                println!("Received Kline message: {data}");
                 let payload = serde_json::from_str::<Payload>(data);
                 match payload {
                     Ok(payload) => {
@@ -475,7 +475,7 @@ impl KlineStreaming {
                         Ok(Some(Ok(kline_data)))
                     }
                     _ => {
-                        println!("Failed to parse Kline data: {}", data);
+                        println!("Failed to parse Kline data: {data}");
                         Ok(Some(Err(anyhow::Error::msg("Failed to parse Kline data"))))
                     }
                 }
@@ -494,7 +494,7 @@ impl KlineStreaming {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error processing Kline data: {}", e);
+                    eprintln!("Error processing Kline data: {e}");
                 }
             }
         }
@@ -606,11 +606,13 @@ pub trait MessageHandler<T: Send + Sync + Clone + Serialize + for<'de> Deseriali
     async fn handle_message(&mut self, message: &T) -> Result<()>;
 }
 
+#[allow(dead_code)]
 struct PrintKlineHandler {
     count: usize,
 }
 
 impl PrintKlineHandler {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self { count: 0 }
     }
@@ -667,7 +669,7 @@ mod tests {
             match result {
                 Ok(kline_data) => {
                     assert_eq!(kline_data.symbol, "BTCUSDT");
-                    println!("Received Kline data: {:?}", kline_data);
+                    println!("Received Kline data: {kline_data:?}");
                     count += 1;
                     if count >= 10 {
                         break; // Limit the test to 10 messages for performance
@@ -675,7 +677,7 @@ mod tests {
                 }
                 Err(e) => {
                     count += 1;
-                    eprintln!("Error parsing Kline data: {}", e);
+                    eprintln!("Error parsing Kline data: {e}");
                     continue; // Continue to the next message
                 }
             }

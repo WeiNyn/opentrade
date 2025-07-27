@@ -2,7 +2,7 @@ use std::env::var;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use binance_spot_connector_rust::{market::klines::KlineInterval, market_stream::kline};
+use binance_spot_connector_rust::{market::klines::KlineInterval};
 use opentrade_core::{
     data_source::websocket::{KlineStreaming, MessageHandler},
     models::{KlineData, SerdableKlineData},
@@ -296,7 +296,7 @@ async fn main() {
 
     let database_url = var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:password@localhost/postgres".to_string());
-    log::info!("Connecting to database at {}", database_url);
+    log::info!("Connecting to database at {database_url}");
     let pool = PgPool::connect(&database_url)
         .await
         .expect("Failed to connect to database");

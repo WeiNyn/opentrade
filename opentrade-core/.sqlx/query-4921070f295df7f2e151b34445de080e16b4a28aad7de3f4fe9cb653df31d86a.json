@@ -1,0 +1,109 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT * FROM kline_data\n            WHERE start_time > $1 AND end_time <= $2 AND symbol = $3 AND interval = $4\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "end_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "symbol",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "interval",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "first_trade_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_trade_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "open",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "high",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "low",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "close",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "volume",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "trade_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "quote_volume",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "update_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "4921070f295df7f2e151b34445de080e16b4a28aad7de3f4fe9cb653df31d86a"
+}

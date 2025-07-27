@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # TimescaleDB - PostgreSQL with TimescaleDB extension
   timescaledb:
-    image: timescale/timescaledb:pg17
+    image: timescale/timescaledb:2.21.1-pg17
     container_name: opentrade-timescaledb
     restart: unless-stopped
     environment:
@@ -16,7 +16,7 @@ services:
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,63 +33,9 @@ services:
         condition: service_healthy
     volumes:
       - ./migrations:/migrations:ro
-    command: [
-      "-path=/migrations",
-      "-database=postgres://postgres:password@timescaledb:5432/postgres?sslmode=disable",
-      "up"
-    ]
+    command: [ "-path=/migrations", "-database=postgres://postgres:password@timescaledb:5432/postgres?sslmode=disable", "up" ]
     networks:
       - opentrade-network
-    restart: "no"
-
-  # Streaming klines service - main application
-  streaming-klines:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-}
-    container_name: opentrade-streaming-klines
-    restart: unless-stopped
-    depends_on:
-      timescaledb:
-        condition: service_healthy
-      migrations:
-        condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgres://postgres:password@timescaledb:5432/postgres
-      RUST_LOG: ${RUST_LOG:-info}
-      RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
-    command: ["/app/bin/streaming_klines"]
-    networks:
-      - opentrade-network
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f streaming_klines"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  # Backfill service - optional, can be run manually
-  backfill-klines:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-}
-    container_name: opentrade-backfill-klines
-    depends_on:
-      timescaledb:
-        condition: service_healthy
-      migrations:
-        condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgres://postgres:password@timescaledb:5432/postgres
-      RUST_LOG: ${RUST_LOG:-info}
-      RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
-    command: ["/app/bin/backfill_klines"]
-    networks:
-      - opentrade-network
-    profiles:
-      - backfill
     restart: "no"
 
   # Grafana - Data visualization dashboard
@@ -116,7 +62,7 @@ services:
     networks:
       - opentrade-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -135,4 +81,3 @@ volumes:
     driver: local
   grafana_data:
     name: opentrade-grafana-data
-    driver: local

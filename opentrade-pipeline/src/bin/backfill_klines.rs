@@ -2,7 +2,7 @@ use binance_spot_connector_rust::market::klines::KlineInterval;
 use chrono::NaiveDateTime;
 use clap::Parser;
 use env_logger::Builder;
-use tokio_cron_scheduler::{Job, JobScheduler, JobSchedulerError};
+use tokio_cron_scheduler::{Job, JobScheduler};
 
 /// Command line arguments for the kline data backfill binary.
 ///
@@ -172,7 +172,7 @@ pub async fn main() {
     // Placeholder for actual backfill logic
     // backfill_klines(args.symbol, args.start_time, args.end_time, args.interval).await;
     let symbol = args.symbol;
-    log::info!("{}", start_time);
+    log::info!("{start_time}");
     let start_time = NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
         .expect("Failed to parse start time")
         .and_utc()
@@ -204,16 +204,8 @@ pub async fn main() {
         .await
         .expect("Failed to connect to the database");
 
-    
-
     log::info!(
-        "Starting backfill for symbol: {}, interval: {}, start_time: {}, end_time: {:?}, limit: {:?}, delay: {:?}",
-        symbol,
-        interval,
-        start_time,
-        end_time,
-        limit,
-        delay
+        "Starting backfill for symbol: {symbol}, interval: {interval}, start_time: {start_time}, end_time: {end_time:?}, limit: {limit:?}, delay: {delay:?}"
     );
     let total_backfilled = opentrade_core::ingest::backfill::klines::kline_backfill_all(
         &pool, &symbol, interval, start_time, end_time, limit, delay,
@@ -221,5 +213,36 @@ pub async fn main() {
     .await
     .expect("Failed to backfill kline data");
 
-    log::info!("Total backfilled klines: {}", total_backfilled);
+    log::info!("Total backfilled klines: {total_backfilled}");
+
+    let sched = JobScheduler::new().await.unwrap();
+
+    sched
+        .add(
+            Job::new_async("0 1/5 * * * *", move |_, _| {
+                let symbol = symbol.clone();
+                let interval = interval;
+                let db_connection = db_connection.clone();
+                Box::pin(async move {
+                    log::info!("Scheduled backfill for symbol: {symbol}, interval: {interval}",);
+                    let pool = sqlx::PgPool::connect(&db_connection)
+                        .await
+                        .expect("Failed to connect to the database");
+                    let now = chrono::Utc::now();
+                    let start_time = now.timestamp_millis() as u64 - 10 * 60 * 1000; // 5 minutes ago
+                    let end_time = None; // Backfill until now
+                    opentrade_core::ingest::backfill::klines::kline_backfill_all(
+                        &pool, &symbol, interval, start_time, end_time, limit, delay,
+                    )
+                    .await
+                    .expect("Failed to backfill kline data");
+                })
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    log::info!("Scheduler started, waiting for jobs...");
+    sched.start().await.unwrap();
 }

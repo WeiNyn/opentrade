@@ -1,16 +1,38 @@
-FROM debian:bullseye-slim
+# Stage 1: Build the Rust application
+FROM rust:1.88-slim-bookworm AS builder
 
-# Set the working directory
-WORKDIR /usr/local/bin
+# Install necessary dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    libssl-dev \
+    pkg-config \
+    build-essential \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the compiled binary from the builder stage
-# The binary is located in /usr/src/myapp/target/release/streaming_klines from the previous stage
-COPY ./target/release/streaming_klines .
-COPY ./target/release/backfill_klines .
+# Set the working directory inside the container
+WORKDIR /app
 
+# Now copy the actual source code
+COPY . .
 
-# Set the default command to run the application
-CMD ["./streaming_klines"]
+# Build the release binary
+RUN DATABASE_URL=postgres://postgres:password@localhost/postgres cargo build --release --package opentrade-pipeline
 
-# You can also expose ports if your application is a web server
-# EXPOSE 8000
+# Stage 2: Create the final image
+# Use a minimal base image to reduce size
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y \
+    openssl \
+    libssl-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/target/release/streaming_klines /app/streaming_klines
+COPY --from=builder /app/target/release/backfill_klines /app/backfill_klines
+
+CMD [ "/app/streaming_klines" ]
