@@ -301,8 +301,39 @@ impl Payload {
     }
 }
 
+/// Configuration for a Kline data subscription.
+///
+/// This struct encapsulates the parameters needed to subscribe to a specific
+/// Kline (candlestick) data stream from a cryptocurrency exchange. It defines
+/// both the trading pair symbol and the time interval for data aggregation.
+///
+/// # Fields
+///
+/// - `symbol`: The trading pair symbol (e.g., "BTCUSDT", "ETHUSDT")
+/// - `interval`: The time interval for Kline aggregation (e.g., 1 minute, 1 hour)
+///
+/// # Usage
+///
+/// This struct is typically used internally by the streaming infrastructure
+/// to configure WebSocket subscriptions. Most applications will use the
+/// higher-level [`KlineStreaming`] interface instead of working with
+/// subscriptions directly.
+///
+/// # Example
+///
+/// ```rust
+/// use opentrade_core::data_source::websocket::KlineSubscription;
+/// use binance_spot_connector_rust::market::klines::KlineInterval;
+///
+/// let subscription = KlineSubscription {
+///     symbol: "BTCUSDT".to_string(),
+///     interval: KlineInterval::Minutes1,
+/// };
+/// ```
 pub struct KlineSubscription {
+    /// The trading pair symbol for the subscription (e.g., "BTCUSDT")
     pub symbol: String,
+    /// The time interval for Kline data aggregation
     pub interval: market::klines::KlineInterval,
 }
 
@@ -454,6 +485,48 @@ impl KlineStreaming {
         self.callbacks.push(Box::new(handler));
     }
 
+    /// Subscribes to the Kline data stream for the configured symbol and interval.
+    ///
+    /// This method initiates the WebSocket subscription to receive real-time Kline data
+    /// for the trading pair and interval specified during [`KlineStreaming::new()`].
+    /// After successful subscription, incoming messages can be processed using [`next()`]
+    /// or [`listen()`].
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` - Subscription was successful and the stream is ready to receive data
+    /// - `Err(anyhow::Error)` - Subscription failed due to WebSocket or network issues
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if:
+    /// - The WebSocket connection is not established or has been closed
+    /// - Network connectivity issues prevent the subscription request
+    /// - The exchange rejects the subscription (invalid symbol/interval)
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use opentrade_core::data_source::websocket::KlineStreaming;
+    /// use binance_spot_connector_rust::market::klines::KlineInterval;
+    /// # use anyhow::Result;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     let mut stream = KlineStreaming::new("BTCUSDT", KlineInterval::Minutes1).await?;
+    ///
+    ///     // Subscribe to the stream
+    ///     stream.subscribe().await?;
+    ///
+    ///     println!("Successfully subscribed to BTCUSDT 1m kline stream");
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// This method must be called before attempting to receive data with [`next()`] or [`listen()`].
+    /// Multiple calls to subscribe will replace the previous subscription.
     pub async fn subscribe(&mut self) -> Result<()> {
         self.state
             .subscribe(vec![&KlineStream::new(&self.symbol, self.interval).into()])
@@ -461,6 +534,58 @@ impl KlineStreaming {
         Ok(())
     }
 
+    /// Retrieves the next Kline message from the WebSocket stream.
+    ///
+    /// This method provides low-level access to individual WebSocket messages, allowing
+    /// for manual processing and error handling. It's suitable for applications that need
+    /// fine-grained control over message processing or custom error handling logic.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Some(Ok(SerdableKlineData)))` - Successfully received and parsed Kline data
+    /// - `Ok(Some(Err(anyhow::Error)))` - Received message but parsing failed
+    /// - `Ok(None)` - WebSocket stream has ended (connection closed)
+    /// - `Err(anyhow::Error)` - Critical error in WebSocket communication
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if:
+    /// - The WebSocket connection encounters a critical failure
+    /// - Binary data cannot be converted to UTF-8 string
+    /// - JSON deserialization fails for the WebSocket message structure
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use opentrade_core::data_source::websocket::KlineStreaming;
+    /// use binance_spot_connector_rust::market::klines::KlineInterval;
+    /// # use anyhow::Result;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     let mut stream = KlineStreaming::new("BTCUSDT", KlineInterval::Minutes1).await?;
+    ///     stream.subscribe().await?;
+    ///
+    ///     // Process messages individually
+    ///     while let Some(result) = stream.next().await? {
+    ///         match result {
+    ///             Ok(kline_data) => {
+    ///                 println!("Received: {} at price {}", kline_data.symbol, kline_data.close);
+    ///             }
+    ///             Err(e) => {
+    ///                 eprintln!("Parse error: {}", e);
+    ///                 continue; // Skip invalid messages
+    ///             }
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// For most applications, consider using [`listen()`] instead, which provides
+    /// automatic message processing with registered callbacks and handles errors gracefully.
     pub async fn next(&mut self) -> Result<Option<Result<SerdableKlineData>>> {
         match self.state.as_mut().next().await {
             Some(Ok(message)) => {
@@ -485,6 +610,75 @@ impl KlineStreaming {
         }
     }
 
+    /// Starts listening for Kline messages and processes them using registered callbacks.
+    ///
+    /// This method provides a high-level interface for continuous message processing.
+    /// It automatically handles the message retrieval loop and delegates processing
+    /// to all registered [`MessageHandler`] callbacks. This is the recommended approach
+    /// for most applications that need automated data processing.
+    ///
+    /// # Behavior
+    ///
+    /// - Continuously calls [`next()`] to retrieve messages
+    /// - For each successful message, invokes all registered callbacks in sequence
+    /// - Logs parsing errors and continues processing (non-fatal)
+    /// - Stops processing if a callback returns an error (fatal)
+    /// - Returns when the WebSocket stream ends or a critical error occurs
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` - Stream ended gracefully (connection closed by server)
+    /// - `Err(anyhow::Error)` - Critical error occurred or callback failed
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if:
+    /// - A registered callback returns an error during message processing
+    /// - Critical WebSocket communication errors occur
+    /// - The underlying [`next()`] method encounters unrecoverable errors
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use opentrade_core::data_source::websocket::{KlineStreaming, MessageHandler};
+    /// use opentrade_core::models::SerdableKlineData;
+    /// use binance_spot_connector_rust::market::klines::KlineInterval;
+    /// use async_trait::async_trait;
+    /// use anyhow::Result;
+    ///
+    /// struct MyHandler;
+    ///
+    /// #[async_trait]
+    /// impl MessageHandler<SerdableKlineData> for MyHandler {
+    ///     async fn handle_message(&mut self, message: &SerdableKlineData) -> Result<()> {
+    ///         println!("Processing: {}", message.symbol);
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     let mut stream = KlineStreaming::new("BTCUSDT", KlineInterval::Minutes1).await?;
+    ///     stream.add_callback(MyHandler);
+    ///     stream.subscribe().await?;
+    ///
+    ///     // Start continuous processing (blocks until stream ends or error)
+    ///     stream.listen().await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Callback Processing
+    ///
+    /// Callbacks are executed sequentially for each message. If any callback returns
+    /// an error, processing stops immediately. For non-critical errors, callbacks
+    /// should handle them internally and return `Ok(())` to continue processing.
+    ///
+    /// # Performance Considerations
+    ///
+    /// Since callbacks are executed sequentially, avoid long-running operations in
+    /// callback implementations. Consider using async channels or background tasks
+    /// for time-consuming operations like database writes or external API calls.
     pub async fn listen(&mut self) -> Result<()> {
         while let Some(result) = self.next().await? {
             match result {

@@ -1,94 +1,137 @@
-// use binance_spot_connector_rust::{
-//     http::Credentials,
-//     hyper::{BinanceHttpClient, Error},
-//     market::{self, klines::KlineInterval},
-//     market_stream::{kline::KlineStream, klines},
-//     tokio_tungstenite::BinanceWebSocketClient,
-// };
-// use env_logger::Builder;
-// use futures_util::StreamExt;
-// use std::time::Duration;
-// use crate::ingest::backfill::klines::{kline_backfill, kline_backfill_all};
-// /// The main entry point for the `opentrade` application.
-// ///
-// /// This function initializes the application and starts the necessary services.
-// /// Currently, it contains commented-out code for WebSocket connections and a
-// /// simple HTTP client request to fetch Kline data from Binance.
-// #[tokio::main]
-// async fn main() {
-//     Builder::from_default_env()
-//         .filter(None, log::LevelFilter::Info)
-//         .init();
+//! # OpenTrade Root Application
+//!
+//! This is the main entry point for the OpenTrade cryptocurrency trading data management system.
+//! It serves as a placeholder and orchestration point for the various components of the OpenTrade
+//! ecosystem, which includes real-time data streaming, historical data backfilling, and
+//! comprehensive market data management.
+//!
+//! ## System Architecture
+//!
+//! The OpenTrade system is organized into multiple specialized crates:
+//!
+//! - **`opentrade-core`**: Core library containing data models, database operations, and client implementations
+//! - **`opentrade-pipeline`**: Specialized binaries for data processing and ingestion
+//! - **Root crate**: Main application coordination and CLI interface
+//!
+//! ## Available Components
+//!
+//! ### Core Library (`opentrade-core`)
+//! - **Data Models**: Type-safe structures for kline data, trades, and market information
+//! - **WebSocket Streaming**: Real-time data ingestion from cryptocurrency exchanges
+//! - **REST API Clients**: Historical data fetching and batch operations
+//! - **Database Integration**: PostgreSQL support with optimized schemas and operations
+//!
+//! ### Pipeline Binaries (`opentrade-pipeline`)
+//! - **`backfill_klines`**: Historical data backfilling with configurable time ranges
+//! - **`streaming_klines`**: Real-time kline data streaming and persistence
+//!
+//! ## Quick Start
+//!
+//! ```bash
+//! # Run the main application (development placeholder)
+//! cargo run
+//!
+//! # Backfill historical data for the last 24 hours
+//! cargo run --bin backfill_klines -- \
+//!   --symbol BTCUSDT \
+//!   --interval 1m \
+//!   --back-seconds 86400
+//!
+//! # Start real-time data streaming
+//! KLINE_SYMBOL=BTCUSDT KLINE_INTERVAL=1m cargo run --bin streaming_klines
+//! ```
+//!
+//! ## Configuration
+//!
+//! The system supports configuration through environment variables:
+//!
+//! - `DATABASE_URL`: PostgreSQL connection string
+//! - `KLINE_SYMBOL`: Trading symbol for streaming (default: "BTCUSDT")
+//! - `KLINE_INTERVAL`: Data interval (default: "1m")
+//!
+//! ## Development
+//!
+//! This root application currently serves as a development placeholder that demonstrates
+//! the system structure. In production deployments, it could be extended to provide:
+//! - System orchestration and service coordination
+//! - Health monitoring and status reporting
+//! - CLI management interface
+//! - Configuration management
+//!
+//! ## Dependencies
+//!
+//! The system relies on several key dependencies:
+//! - **Binance Connector**: For exchange API integration
+//! - **SQLx**: For type-safe database operations
+//! - **Tokio**: For asynchronous runtime support
+//! - **Serde**: For JSON serialization/deserialization
+//! - **Chrono**: For timestamp and date handling
 
-//     // let (mut conn, _) = BinanceWebSocketClient::connect_async_default()
-//     //     .await
-//     //     .expect("Failed to connect to Binance WebSocket");
-
-//     // conn.subscribe(vec![
-//     //     &KlineStream::new("BTCUSDT", KlineInterval::Minutes1).into(),
-//     // ])
-//     // .await;
-
-//     // let timer = tokio::time::Instant::now();
-//     // let duration = Duration::new(10, 0); // 10 seconds
-
-//     // while let Some(message) = conn.as_mut().next().await {
-//     //     if timer.elapsed() >= duration {
-//     //         log::info!("10 seconds elapsed, closing connection.");
-//     //         break;
-//     //     }
-//     //     match message {
-//     //         Ok(message) => {
-//     //             let binary_data = message.into_data();
-//     //             let data = std::str::from_utf8(&binary_data)
-//     //                 .expect("Failed to convert binary data to string");
-//     //             log::info!("Received message: {}", data);
-//     //         }
-//     //         Err(e) => {
-//     //             log::error!("Error receiving message: {}", e);
-//     //             break;
-//     //         }
-//     //     }
-//     // }
-//     // conn.close().await.expect("Failed to close connection");
-//     print!("This is a print message for testing purposes");
-//     log::error!("This is an error message for testing purposes");
-//     let client = BinanceHttpClient::default();
-//     let response = client
-//         .send(market::klines::Klines::new("BTCUSDT", KlineInterval::Minutes1))
-//         .await.unwrap();
-
-//     let data = response.into_body_str().await.unwrap();
-//     print!("Kline data: {}", data);
-
-//     let pool = sqlx::PgPool::connect("postgres://postgres:password@localhost/postgres")
-//         .await
-//         .expect("Failed to connect to the database");
-
-//     let symbols = "BTCUSDT";
-//     let interval = KlineInterval::Minutes1;
-//     let start_time: u64 = 1750000000000; // Example start time in milliseconds
-//     let end_time: Option<u64> = None; // Example end time, can be None for continuous backfill
-//     let limit: Option<u32> = Some(1000); // Example limit for the number of klines to fetch
-//     let delay: Option<u64> = Some(180000); // Example delay in milliseconds between requests    
-
-//     let total_backfilled = kline_backfill_all(
-//         &pool,
-//         symbols,
-//         interval,
-//         start_time,
-//         end_time,
-//         limit,
-//         delay,
-//     )
-//     .await
-//     .expect("Failed to backfill kline data");
-
-//     log::info!("Total backfilled klines: {}", total_backfilled);
-// }
-
+/// Main entry point for the OpenTrade root application.
+///
+/// This is a placeholder application that serves as the main entry point for the
+/// OpenTrade cryptocurrency trading data management system. The actual functionality
+/// is implemented in the `opentrade-core` library and various specialized binaries
+/// in the `opentrade-pipeline` crate.
+///
+/// # Purpose
+///
+/// This binary currently serves as a development placeholder and demonstrates the
+/// basic structure of the OpenTrade application. In a production deployment, this
+/// could be extended to:
+/// - Orchestrate multiple data pipeline components
+/// - Provide a CLI interface for system management
+/// - Initialize and coordinate various trading data services
+/// - Serve as a health check endpoint for container deployments
+///
+/// # Current Status
+///
+/// The function prints a simple message indicating that the main implementation
+/// resides in the `opentrade-core` crate. This design follows Rust best practices
+/// of keeping the main application logic in library crates while using binary
+/// crates for specific executables.
+///
+/// # Architecture
+///
+/// The OpenTrade system is organized as follows:
+/// - **`opentrade-core`**: Core library with data models, WebSocket/REST clients, and database operations
+/// - **`opentrade-pipeline`**: Specialized binaries for data ingestion (`backfill_klines`, `streaming_klines`)
+/// - **Root crate**: Main application entry point (this file)
+///
+/// # Usage
+///
+/// ```bash
+/// # Run the main application
+/// cargo run
+/// 
+/// # For actual data processing, use the specialized binaries:
+/// cargo run --bin backfill_klines -- --symbol BTCUSDT --interval 1m --back-seconds 3600
+/// cargo run --bin streaming_klines
+/// ```
+///
+/// # Development Notes
+///
+/// For reference implementations and examples, see the specialized binaries in the
+/// `opentrade-pipeline` crate that demonstrate:
+/// - Setting up WebSocket connections to Binance
+/// - Fetching historical kline data via REST API
+/// - Database connection and backfill operations
+/// - Logging configuration and error handling
+///
+/// These examples can be used as reference for implementing additional functionality
+/// or for testing individual components during development.
 pub fn main() {
-    println!("This is a placeholder for the main function.");
-    // The actual implementation will be in the opentrade-core crate.
-    // This is just to satisfy the Rust compiler.
+    println!("OpenTrade - Cryptocurrency Trading Data Management System");
+    println!("=========================================================");
+    println!();
+    println!("This is a placeholder for the main application.");
+    println!("The actual implementation is distributed across:");
+    println!("  - opentrade-core: Core library and data models");
+    println!("  - opentrade-pipeline: Data ingestion binaries");
+    println!();
+    println!("Available commands:");
+    println!("  cargo run --bin backfill_klines -- --help");
+    println!("  cargo run --bin streaming_klines");
+    println!();
+    println!("For more information, see the documentation in each crate.");
 }
