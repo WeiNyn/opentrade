@@ -244,5 +244,13 @@ pub async fn main() {
         .unwrap();
 
     log::info!("Scheduler started, waiting for jobs...");
-    sched.start().await.unwrap();
+    if let Err(e) = sched.start().await {
+        log::error!("Failed to start scheduler: {e}");
+        return;
+    }
+
+    // Keep the scheduler running
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+    }
 }
